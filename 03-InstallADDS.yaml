@@ -1,0 +1,42 @@
+trigger:
+- none
+
+parameters:
+- name: env
+  displayName: Environment
+  type: string
+  default: d
+  values:
+  - d
+  - p
+
+- name: tag
+  type: string
+  default: dc01
+  values:
+  - dc01
+
+variables:
+  - group: addeploy-${{parameters.env}}
+
+stages:
+- stage: InstallOnPrem
+  jobs:
+  - deployment: InstallADDS
+    displayName: 'Install ADDS'
+    environment: 
+      name: $(EnviormentName)
+      resourceType: VirtualMachine
+      tags: ${{parameters.tag}}
+      #Tag can not be  populated by variable.
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          #- checkout: self
+          - powershell: |
+              Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
+              Import-Module ADDSDeployment
+              $password=$(adminpassword)
+              $securePassword = $password | ConvertTo-SecureString -AsPlainText -Force;
+              Install-ADDSForest -CreateDnsDelegation:$false -DatabasePath "C:\Windows\NTDS" -DomainMode "WinThreshold" -DomainName $(adDomainName) -DomainNetbiosName $(adDomainNameShort) -ForestMode "WinThreshold" -InstallDns:$true -LogPath "C:\Windows\NTDS" -SysvolPath "C:\Windows\SYSVOL" -Force:$true -SafeModeAdministratorPassword $securePassword

@@ -1,0 +1,32 @@
+trigger:
+  - none
+
+parameters:
+- name: env
+  displayName: Environment
+  type: string
+  default: d
+  values:
+  - d
+  - p
+
+variables:
+  - group: addeploy-${{parameters.env}}
+
+pool:
+  vmImage: windows-latest
+
+
+
+
+steps:
+- task: AzureResourceManagerTemplateDeployment@3
+  displayName: 'ARM Template deployment: Resource Group scope'
+  inputs:
+    azureResourceManagerConnection: $(serviceConnectionName)
+    subscriptionId: $(subscriptionId)
+    resourceGroupName: '$(ResourceGroupName)'
+    location: '$(Location)'
+    csmFile: '$(System.DefaultWorkingDirectory)/ARM/vm-domain-join-existing/azuredeploy.json'
+    csmParametersFile: '$(System.DefaultWorkingDirectory)/ARM/vm-domain-join-existing/azuredeploy.parameters.json'
+    overrideParameters: '-vmList $(VmName2) -location $(Location) -domainJoinUserName $(adDomainNameShort)\$(admin) -domainJoinUserPassword $(adminpassword) -domainFQDN $(adDomainName) -ouPath ""'

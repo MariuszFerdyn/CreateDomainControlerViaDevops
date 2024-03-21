@@ -1,0 +1,71 @@
+trigger:
+  - none
+
+parameters:
+- name: env
+  displayName: Environment
+  type: string
+  default: d
+  values:
+  - d
+  - p
+
+variables:
+  - group: addeploy-${{parameters.env}}
+
+pool:
+  vmImage: windows-latest
+
+
+
+
+steps:
+- task: AzureCLI@2
+  displayName: 'CreateRG'
+  inputs:
+    azureSubscription: $(serviceConnectionName)
+    addSpnToEnvironment: true
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+       az group create -l $(Location) -n $(ResourceGroupName)
+- task: AzurePowerShell@5
+  displayName: CreateVM
+  inputs:
+    azureSubscription: '$(serviceConnectionName)'
+    azurePowerShellVersion: 'LatestVersion'
+    ScriptType: InlineScript
+    Inline: |
+         #
+         # Create VM
+         #
+         function NewWinAzureVM($rgname, $loc, $vnetName, $subnetName, $vmname, $VMSize, $user, $password, $securityType, $PublisherName, $Offer, $SKU, $DNS)
+         {
+         	Write-Host "Resource-Group         : $rgname"
+         	Write-Host "Location               : $loc"
+         	Write-Host "Vnet Name              : $vnetName"
+         	Write-Host "Subnet Name            : $subnetName"
+         	Write-Host "VM Name                : $vmname"
+         	Write-Host "VM Size                : $VMSize"
+         	Write-Host "User                   : $user"
+         	Write-Host "Security Type          : $securityType"
+         	Write-Host "Publisher Name         : $PublisherName"
+         	Write-Host "Offer                  : $Offer"
+         	Write-Host "SKU                    : $SKU"
+            Write-Host "DNS                    : $DNS"
+
+         	$securePassword = $password | ConvertTo-SecureString -AsPlainText -Force;
+         	$cred = New-Object System.Management.Automation.PSCredential ($user, $securePassword);
+         	# Network setup
+         	$vnet = Get-AzVirtualNetwork -Name $vnetName -ResourceGroupName $rgname
+         	$subnet = Get-AzVirtualNetworkSubnetConfig -Name $subnetName -VirtualNetwork $vnet
+         	$nic = New-AzNetworkInterface -Name "$vmName-NIC" -ResourceGroupName $rgname -Location $loc -SubnetId $subnet.Id -DnsServer $DNS
+         	# VM
+         	$vmConfig = New-AzVMConfig -VMName $vmName -VMSize $VMSize
+         	Set-AzVMOperatingSystem -VM $vmConfig -Windows -ComputerName $vmName -Credential $cred
+         	Set-AzVMSourceImage -VM $vmConfig -PublisherName $PublisherName -Offer $Offer -Skus $SKU -Version latest
+         	Add-AzVMNetworkInterface -VM $vmConfig -Id $nic.Id
+         	Set-AzVMBootDiagnostic -VM $vmConfig -Enable 
+         	New-AzVM -ResourceGroupName $rgname -Location $loc -VM $vmConfig
+         }
+         NewWinAzureVM $(ResourceGroupName) "$(Location)" "$(VnetName)" "$(SubnetName)" "$(VmName2)" "$(VMSize)" "$(admin)" "$(adminpassword)" "TrustedLaunch" "MicrosoftWindowsServer" "WindowsServer" "2022-datacenter-azure-edition" "$(DNS)"

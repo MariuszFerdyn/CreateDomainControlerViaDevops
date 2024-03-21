@@ -1,0 +1,44 @@
+trigger:
+  - none
+
+parameters:
+- name: env
+  displayName: Environment
+  type: string
+  default: d
+  values:
+  - d
+  - p
+
+variables:
+  - group: addeploy-${{parameters.env}}
+
+pool:
+  vmImage: windows-latest
+
+
+steps:
+  - task: AzureCLI@2
+    displayName: "Download Environment Agent"
+    inputs:
+      azureSubscription: "$(serviceConnectionName)"
+      scriptType: "ps"
+      scriptLocation: "inlineScript"
+      inlineScript: az vm run-command invoke  --command-id RunPowerShellScript --name $(VmName) -g $(ResourceGroupName)  --scripts "New-Item -Path 'C:\' -Name 'azagent' -ItemType 'directory' ; cd C:\azagent; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12 ; Invoke-WebRequest -Uri $(DevopsURL) -OutFile 'C:\azagent\azagent_file.zip'"
+
+  - task: AzureCLI@2
+    displayName: "Extract Environment Agent"
+    inputs:
+      azureSubscription: "$(serviceConnectionName)"
+      scriptType: "ps"
+      scriptLocation: "inlineScript"
+      inlineScript: az vm run-command invoke  --command-id RunPowerShellScript --name $(VmName) -g $(ResourceGroupName)  --scripts "cd C:\azagent;  Expand-Archive -LiteralPath 'C:\azagent\azagent_file.zip' -DestinationPath . -Force "
+
+  - task: AzureCLI@2
+    displayName: "Install Environment Agent"
+    inputs:
+      azureSubscription: "$(serviceConnectionName)"
+      scriptType: "ps"
+      scriptLocation: "inlineScript"
+      inlineScript: az vm run-command invoke  --command-id RunPowerShellScript --name $(VmName) -g $(ResourceGroupName)  --scripts "cd C:\azagent; .\config.cmd --environment --unattended  --environmentName  $(EnviormentName) --addvirtualmachineresourcetags --virtualmachineresourcetags $(VmName) --agent $(VmName) --runasservice --work '_work' --url 'https://dev.azure.com/fastsms/' --projectname $(ProjectName)  --auth PAT --token $(PAT) "
+      failOnStandardError: true
