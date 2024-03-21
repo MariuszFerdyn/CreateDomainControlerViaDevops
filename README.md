@@ -7,7 +7,12 @@ Please notice that in 03-InstallADDS.yaml and 99-TestDevops.yaml we are using:
 tags: ${{parameters.tag}}
 ```
 
-We can not use just variable like ($tag) probably due to the error in Azure DevOps (MS is going to fix it).
+We can not use just variable like
+```bash
+tags: $(tag)
+```
+
+probably due to the error in Azure DevOps (MS is going to fix it).
 
 It is fix for:
 ```bash
